@@ -1,0 +1,5 @@
+# Only keep publish folder
+/*
+!/.gitignore
+!/.github
+!/publish

@@ -1,0 +1,66 @@
+name: Update
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch binary from private repo
+        env:
+          PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          PRIVATE_REPO: ${{ secrets.PRIVATE_REPO }}
+        run: |
+          mkdir -p publish
+          curl -L -H "Authorization: token ${PRIVATE_REPO_TOKEN}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o publish/Performer \
+               "https://api.github.com/repos/${PRIVATE_REPO}/contents/publish/Performer"
+          chmod +x publish/Performer
+
+      - name: Fetch state from private repo
+        env:
+          PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          PRIVATE_REPO: ${{ secrets.PRIVATE_REPO }}
+        run: |
+          curl -H "Authorization: token ${PRIVATE_REPO_TOKEN}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o state.json \
+               "https://api.github.com/repos/${PRIVATE_REPO}/contents/state.json" || echo '{"PostedIds":[],"LastUpdated":"2024-01-01T00:00:00Z"}' > state.json
+
+      - name: Run
+        env:
+          TARGET_TOKEN: ${{ secrets.TARGET_TOKEN }}
+          TARGET_CHANNEL: ${{ secrets.TARGET_CHANNEL }}
+          TARGET_TOPICS: ${{ secrets.TARGET_TOPICS }}
+          TARGET_LINK: ${{ secrets.TARGET_LINK }}
+          SOURCE_URL: ${{ secrets.SOURCE_URL }}
+          STATE_FILE: state.json
+        run: ./publish/Performer
+
+      - name: Push state to private repo
+        env:
+          PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          PRIVATE_REPO: ${{ secrets.PRIVATE_REPO }}
+        run: |
+          STATE_CONTENT=$(base64 -w 0 state.json)
+          SHA=$(curl -s -H "Authorization: token ${PRIVATE_REPO_TOKEN}" \
+                "https://api.github.com/repos/${PRIVATE_REPO}/contents/state.json" | jq -r '.sha // empty')
+
+          if [ -n "$SHA" ]; then
+            curl -X PUT -H "Authorization: token ${PRIVATE_REPO_TOKEN}" \
+                 -H "Content-Type: application/json" \
+                 -d "{\"message\":\"Update state [skip ci]\",\"content\":\"${STATE_CONTENT}\",\"sha\":\"${SHA}\"}" \
+                 "https://api.github.com/repos/${PRIVATE_REPO}/contents/state.json"
+          else
+            curl -X PUT -H "Authorization: token ${PRIVATE_REPO_TOKEN}" \
+                 -H "Content-Type: application/json" \
+                 -d "{\"message\":\"Update state [skip ci]\",\"content\":\"${STATE_CONTENT}\"}" \
+                 "https://api.github.com/repos/${PRIVATE_REPO}/contents/state.json"
+          fi
