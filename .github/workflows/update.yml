@@ -53,14 +53,16 @@ jobs:
           SHA=$(curl -s -H "Authorization: token ${PRIVATE_REPO_TOKEN}" \
                 "https://api.github.com/repos/${PRIVATE_REPO}/contents/state.json" | jq -r '.sha // empty')
 
+          COMMITTER='{"name":"github-actions[bot]","email":"github-actions[bot]@users.noreply.github.com"}'
+
           if [ -n "$SHA" ]; then
             curl -X PUT -H "Authorization: token ${PRIVATE_REPO_TOKEN}" \
                  -H "Content-Type: application/json" \
-                 -d "{\"message\":\"Update state [skip ci]\",\"content\":\"${STATE_CONTENT}\",\"sha\":\"${SHA}\"}" \
+                 -d "{\"message\":\"Update state\",\"content\":\"${STATE_CONTENT}\",\"sha\":\"${SHA}\",\"committer\":${COMMITTER}}" \
                  "https://api.github.com/repos/${PRIVATE_REPO}/contents/state.json"
           else
             curl -X PUT -H "Authorization: token ${PRIVATE_REPO_TOKEN}" \
                  -H "Content-Type: application/json" \
-                 -d "{\"message\":\"Update state [skip ci]\",\"content\":\"${STATE_CONTENT}\"}" \
+                 -d "{\"message\":\"Update state\",\"content\":\"${STATE_CONTENT}\",\"committer\":${COMMITTER}}" \
                  "https://api.github.com/repos/${PRIVATE_REPO}/contents/state.json"
           fi
